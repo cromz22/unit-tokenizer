@@ -51,6 +51,7 @@ class BPETokenizer:
 
         ids = list(train_data)
         initial_vocab_size = len(set(ids))
+        max_id = max(ids)
 
         if target_vocab_size <= initial_vocab_size:
             error_message = f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
@@ -66,10 +67,12 @@ class BPETokenizer:
                 self.logger.warning("No more pairs to merge.")
                 break
             top_pair = max(counts, key=counts.get)
-            new_idx = initial_vocab_size + i
+            new_idx = max_id + 1
             ids = self._merge(ids, top_pair, new_idx)
             self.merges[top_pair] = new_idx
             self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}; IDs: {ids}")
+
+            max_id = new_idx
 
         self.logger.info(f"original length: {len(train_data)} -> bpe length: {len(ids)} (compression rate: {len(ids) / len(train_data):.2f})")
 

@@ -19,6 +19,13 @@ def test_decode():
     decoded = tokenizer.decode(encoded)
     assert decoded == [0, 1, 0, 1, 2, 3, 4, 5]
 
+def test_arbitrary_onset():
+    tokenizer = BPETokenizer()
+    tokenizer.fit(train_data=[1, 2, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6], target_vocab_size=10)
+    encoded = tokenizer.encode([1, 2, 1, 2, 3, 4, 5, 6])
+    decoded = tokenizer.decode(encoded)
+    assert decoded == [1, 2, 1, 2, 3, 4, 5, 6]
+
 def test_save_and_load():
     tokenizer = BPETokenizer()
     tokenizer.fit(train_data=[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5], target_vocab_size=10)
@@ -40,7 +47,8 @@ def main():
     # test_fit()
     # test_encode()
     # test_decode()
-    test_save_and_load()
+    test_arbitrary_onset()
+    # test_save_and_load()
 
 
 if __name__ == "__main__":
