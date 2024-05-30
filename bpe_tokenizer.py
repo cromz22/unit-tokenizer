@@ -36,7 +36,6 @@ class BPETokenizer(BaseTokenizer):
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.merges = {}
-        self.vocab = {}
 
     def _get_counts(self, ids: list[int]) -> dict[tuple[int, int], int]:
         """
@@ -69,15 +68,27 @@ class BPETokenizer(BaseTokenizer):
         """
         Fit the tokenizer on the training data.
         """
+        if not train_data:
+            error_message = "Training data is empty."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
         ids = list(train_data)
         initial_vocab_size = len(set(ids))
 
+        if target_vocab_size <= initial_vocab_size:
+            error_message = f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
         num_merges = target_vocab_size - initial_vocab_size
-        assert num_merges > 0
         self.logger.info(f"Performing {num_merges} merges. IDs: {ids}")
 
         for i in range(num_merges):
             counts = self._get_counts(ids)
+            if not counts:
+                self.logger.warning("No more pairs to merge.")
+                break
             top_pair = max(counts, key=counts.get)
             new_idx = initial_vocab_size + i
             ids = self._merge(ids, top_pair, new_idx)
@@ -90,7 +101,10 @@ class BPETokenizer(BaseTokenizer):
         """
         Encode a sequence of integers with merges.
         """
-        assert self.merges, "Tokenizer must be fitted or loaded before encoding"
+        if not self.merges:
+            error_message = "Tokenizer must be fitted or loaded before encoding."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
 
         self.logger.info(f"Encoding: {ids}")
 
@@ -110,7 +124,10 @@ class BPETokenizer(BaseTokenizer):
         """
         Decode a sequence of integers with merges.
         """
-        assert self.merges, "Tokenizer must be fitted or loaded before decoding"
+        if not self.merges:
+            error_message = "Tokenizer must be fitted or loaded before encoding."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
 
         self.logger.info(f"Decoding: {ids}")
 
