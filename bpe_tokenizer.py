@@ -4,31 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-class BaseTokenizer:
-    """
-    Base tokenizer class.
-    """
-
-    def __init__(self) -> None:
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    def fit(self, train_data: list[int], target_vocab_size: int):
-        raise NotImplementedError
-
-    def encode(self, ids: list[int]) -> list[int]:
-        raise NotImplementedError
-
-    def decode(self, ids: list[int]) -> list[int]:
-        raise NotImplementedError
-
-    def save(self, path: str) -> None:
-        self.logger.info(f"Saving tokenizer to {path}")
-
-    def load(self, path: str) -> None:
-        self.logger.info(f"Loading tokenizer from {path}")
-
-
-class BPETokenizer(BaseTokenizer):
+class BPETokenizer:
     """
     Pure BPE tokenizer that operates on a sequence of integers.
     """
@@ -151,3 +127,21 @@ class BPETokenizer(BaseTokenizer):
         self.logger.info(f"Decoded: {ids}")
 
         return ids
+
+    def save(self, json_file: str) -> None:
+        """
+        Save the tokenizer to a file.
+        """
+        with open(json_file, 'w') as f:
+            f.write(str(self.merges))
+
+        self.logger.info(f"Tokenizer saved to {json_file}.")
+
+    def load(self, json_file: str) -> None:
+        """
+        Load the tokenizer from a file.
+        """
+        with open(json_file, 'r') as f:
+            self.merges = eval(f.read())
+
+        self.logger.info(f"Tokenizer loaded from {json_file}.")

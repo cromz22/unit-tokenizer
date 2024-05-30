@@ -19,10 +19,28 @@ def test_decode():
     decoded = tokenizer.decode(encoded)
     assert decoded == [0, 1, 0, 1, 2, 3, 4, 5]
 
+def test_save_and_load():
+    tokenizer = BPETokenizer()
+    tokenizer.fit(train_data=[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5], target_vocab_size=10)
+    tokenizer.save("test_save_and_load.json")
+    tokenizer = None
+
+    tokenizer = BPETokenizer()
+    tokenizer.load("test_save_and_load.json")
+    encoded = tokenizer.encode([0, 1, 0, 1, 2, 3, 4, 5])
+    assert encoded == [6, 9, 5]
+    decoded = tokenizer.decode(encoded)
+    assert decoded == [0, 1, 0, 1, 2, 3, 4, 5]
+
+    # clean up
+    import os
+    os.remove("test_save_and_load.json")
+
 def main():
     # test_fit()
     # test_encode()
-    test_decode()
+    # test_decode()
+    test_save_and_load()
 
 
 if __name__ == "__main__":
