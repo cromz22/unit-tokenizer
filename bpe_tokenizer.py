@@ -88,11 +88,11 @@ class BPETokenizer(BaseTokenizer):
 
     def encode(self, ids: list[int]) -> list[int]:
         """
-        Encode a sequence of integers.
+        Encode a sequence of integers with merges.
         """
         assert self.merges, "Tokenizer must be fitted or loaded before encoding"
         self.logger.info(f"Encoding: {ids}")
-        while True:
+        while len(ids) >= 2:
             counts = self._get_counts(ids)
             pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
             if pair_to_merge not in self.merges:
