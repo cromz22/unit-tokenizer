@@ -28,7 +28,6 @@ class BaseTokenizer:
         self.logger.info(f"Loading tokenizer from {path}")
 
 
-
 class BPETokenizer(BaseTokenizer):
     """
     Pure BPE tokenizer that operates on a sequence of integers.
@@ -71,27 +70,37 @@ class BPETokenizer(BaseTokenizer):
         Fit the tokenizer on the training data.
         """
         ids = list(train_data)
-        print(ids)
 
         initial_vocab_size = max(ids)
         num_merges = target_vocab_size - initial_vocab_size
         assert num_merges > 0
-        self.logger.info(f"Performing {num_merges} merges")
+        self.logger.info(f"Performing {num_merges} merges. IDs: {ids}")
 
-        merges = {}
         for i in range(num_merges):
             counts = self._get_counts(ids)
             top_pair = max(counts, key=counts.get)
             new_idx = initial_vocab_size + i
             ids = self._merge(ids, top_pair, new_idx)
-            merges[top_pair] = new_idx
+            self.merges[top_pair] = new_idx
             self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}; IDs: {ids}")
 
-        self.logger.info(f"original length: {len(train_data)} -> bpe length: {len(ids)}")
-        self.logger.info(f"compression rate: {len(ids) / len(train_data):.2f}")
+        self.logger.info(f"original length: {len(train_data)} -> bpe length: {len(ids)} (compression rate: {len(ids) / len(train_data):.2f})")
 
     def encode(self, ids: list[int]) -> list[int]:
-        pass
+        """
+        Encode a sequence of integers.
+        """
+        assert self.merges, "Tokenizer must be fitted or loaded before encoding"
+        self.logger.info(f"Encoding: {ids}")
+        while True:
+            counts = self._get_counts(ids)
+            pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
+            if pair_to_merge not in self.merges:
+                break
+            idx = self.merges[pair_to_merge]
+            ids = self._merge(ids, pair_to_merge, idx)
+        self.logger.info(f"Encoded: {ids}")
+        return ids
 
     def decode(self, ids: list[int]) -> list[int]:
         pass
