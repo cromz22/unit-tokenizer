@@ -91,7 +91,9 @@ class BPETokenizer(BaseTokenizer):
         Encode a sequence of integers with merges.
         """
         assert self.merges, "Tokenizer must be fitted or loaded before encoding"
+
         self.logger.info(f"Encoding: {ids}")
+
         while len(ids) >= 2:
             counts = self._get_counts(ids)
             pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
@@ -99,8 +101,36 @@ class BPETokenizer(BaseTokenizer):
                 break
             idx = self.merges[pair_to_merge]
             ids = self._merge(ids, pair_to_merge, idx)
+
         self.logger.info(f"Encoded: {ids}")
+
         return ids
 
     def decode(self, ids: list[int]) -> list[int]:
-        pass
+        """
+        Decode a sequence of integers with merges.
+        """
+        assert self.merges, "Tokenizer must be fitted or loaded before decoding"
+
+        self.logger.info(f"Decoding: {ids}")
+
+        reverse_merges = {v: k for k, v in self.merges.items()}
+        
+        ids_set = set(ids)
+        while ids_set & set(reverse_merges.keys()):
+            decoded_ids = []
+            i = 0
+            while i < len(ids):
+                if ids[i] in reverse_merges:
+                    pair = reverse_merges[ids[i]]
+                    decoded_ids.extend(pair)
+                    i += 1
+                else:
+                    decoded_ids.append(ids[i])
+                    i += 1
+            ids = decoded_ids
+            ids_set = set(ids)
+
+        self.logger.info(f"Decoded: {ids}")
+
+        return ids
