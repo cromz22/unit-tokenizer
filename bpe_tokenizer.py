@@ -70,8 +70,8 @@ class BPETokenizer(BaseTokenizer):
         Fit the tokenizer on the training data.
         """
         ids = list(train_data)
+        initial_vocab_size = len(set(ids))
 
-        initial_vocab_size = max(ids)
         num_merges = target_vocab_size - initial_vocab_size
         assert num_merges > 0
         self.logger.info(f"Performing {num_merges} merges. IDs: {ids}")
