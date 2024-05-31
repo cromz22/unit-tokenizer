@@ -10,6 +10,7 @@ Plain BPE tokenizer that operates on a sequence of integers.
 
 ```
 poetry install
+pre-commit install
 ```
 
 ### Test
