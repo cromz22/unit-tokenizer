@@ -2,7 +2,9 @@ import logging
 import json
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 
 class BPETokenizer:
@@ -28,7 +30,9 @@ class BPETokenizer:
                     counts[pair] = 1
         return counts
 
-    def _merge(self, ids_seq: list[list[int]], pair: tuple[int, int], idx: int) -> list[list[int]]:
+    def _merge(
+        self, ids_seq: list[list[int]], pair: tuple[int, int], idx: int
+    ) -> list[list[int]]:
         """
         Replace all occurrences of `pair` in `ids_seq` with `idx`.
         """
@@ -84,7 +88,6 @@ class BPETokenizer:
 
             max_id = new_idx
 
-
     def encode(self, ids_seq: list[list[int]]) -> list[list[int]]:
         """
         Encode a batch of sequence of integers with merges.
@@ -99,7 +102,9 @@ class BPETokenizer:
         for i, ids in enumerate(ids_seq):
             while len(ids) >= 2:
                 counts = self._get_counts([ids])
-                pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
+                pair_to_merge = min(
+                    counts, key=lambda pair: self.merges.get(pair, float("inf"))
+                )
                 if pair_to_merge not in self.merges:
                     break
                 idx = self.merges[pair_to_merge]
@@ -124,7 +129,7 @@ class BPETokenizer:
 
         if not self.swapped_merges:
             self.swapped_merges = {v: k for k, v in self.merges.items()}
-        
+
         for j, ids in enumerate(ids_seq):
             ids_set = set(ids)
             while ids_set & set(self.swapped_merges.keys()):
@@ -162,7 +167,7 @@ class BPETokenizer:
         self.logger.debug(f"merges: {self.merges}")
         self.logger.debug(f"swapped_merges: {self.swapped_merges}")
 
-        with open(json_file, 'w') as f:
+        with open(json_file, "w") as f:
             json.dump(self.swapped_merges, f)
 
         self.logger.info(f"Tokenizer saved to {json_file}.")
@@ -172,7 +177,7 @@ class BPETokenizer:
         Load the tokenizer from a file.
         """
 
-        with open(json_file, 'r') as f:
+        with open(json_file, "r") as f:
             self.swapped_merges = json.load(f)
 
         self.swapped_merges = {int(k): tuple(v) for k, v in self.swapped_merges.items()}
