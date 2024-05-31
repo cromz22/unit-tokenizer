@@ -88,6 +88,15 @@ class BPETokenizer:
 
             max_id = new_idx
 
+    def fit_from_file(self, train_file: str, target_vocab_size: int):
+        """
+        Fit the tokenizer from a file.
+        `train_file` should contain a sequence of integers separated by spaces per line.
+        """
+        with open(train_file, "r") as f:
+            train_data = [list(map(int, line.strip().split())) for line in f]
+        self.fit(train_data, target_vocab_size)
+
     def encode(self, ids_seq: list[list[int]]) -> list[list[int]]:
         """
         Encode a batch of sequence of integers with merges.
