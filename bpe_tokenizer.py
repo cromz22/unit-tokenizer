@@ -125,6 +125,19 @@ class BPETokenizer:
 
         return ids_seq
 
+    def encode_from_file(self, input_file: str, output_file: str) -> None:
+        """
+        Encode from file input and save the encoded sequences to an output file.
+        `input_file` should contain a sequence of integers separated by spaces per line.
+        `output_file` will contain the encoded sequences.
+        """
+        with open(input_file, "r") as f:
+            ids_seq = [list(map(int, line.strip().split())) for line in f]
+        encoded_ids_seq = self.encode(ids_seq)
+        with open(output_file, "w") as f:
+            for ids in encoded_ids_seq:
+                f.write(" ".join(map(str, ids)) + "\n")
+
     def decode(self, ids_seq: list[list[int]]) -> list[list[int]]:
         """
         Decode a batch of sequence of integers with merges.
@@ -160,6 +173,19 @@ class BPETokenizer:
         self.logger.debug(f"Decoded: {ids_seq}")
 
         return ids_seq
+
+    def decode_from_file(self, input_file: str, output_file: str) -> None:
+        """
+        Decode from file input and save the decoded sequences to an output file.
+        `input_file` should contain a sequence of integers separated by spaces per line.
+        `output_file` will contain the decoded sequences.
+        """
+        with open(input_file, "r") as f:
+            ids_seq = [list(map(int, line.strip().split())) for line in f]
+        decoded_ids_seq = self.decode(ids_seq)
+        with open(output_file, "w") as f:
+            for ids in decoded_ids_seq:
+                f.write(" ".join(map(str, ids)) + "\n")
 
     def save(self, json_file: str) -> None:
         """
