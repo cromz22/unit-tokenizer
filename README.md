@@ -12,6 +12,12 @@ Plain BPE tokenizer that operates on a sequence of integers.
 poetry install
 ```
 
+### Test
+
+```
+poetry run pytest
+```
+
 ## Usage
 
 See `test_bpe_tokenizer.py`.

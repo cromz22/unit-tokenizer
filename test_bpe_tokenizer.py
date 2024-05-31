@@ -136,19 +136,3 @@ def test_decode_from_file():
     # clean up
     os.remove(input_file)
     os.remove(output_file)
-
-
-def main():
-    # test_fit()
-    # test_encode()
-    # test_decode()
-    # test_arbitrary_onset()
-    # test_save_and_load()
-    # test_batch_encode_decode()
-    # test_fit_from_file()
-    test_encode_from_file()
-    test_decode_from_file()
-
-
-if __name__ == "__main__":
-    main()
