@@ -13,45 +13,51 @@ class BPETokenizer:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.merges = {}
 
-    def _get_counts(self, ids: list[int]) -> dict[tuple[int, int], int]:
+    def _get_counts(self, ids_seq: list[list[int]]) -> dict[tuple[int, int], int]:
         """
-        Count the number of occurrences for each pair of ids.
+        Count the number of occurrences for each pair of ids within each inner list.
         """
         counts = {}
-        for pair in zip(ids[:-1], ids[1:]):
-            if pair in counts:
-                counts[pair] += 1
-            else:
-                counts[pair] = 1
+        for ids in ids_seq:
+            for pair in zip(ids[:-1], ids[1:]):
+                if pair in counts:
+                    counts[pair] += 1
+                else:
+                    counts[pair] = 1
         return counts
 
-    def _merge(self, ids: list[int], pair: tuple[int, int], idx: int) -> list[int]:
+    def _merge(self, ids_seq: list[list[int]], pair: tuple[int, int], idx: int) -> list[list[int]]:
         """
-        Replace all occurrences of `pair` in `ids` with `idx`.
+        Replace all occurrences of `pair` in `ids_seq` with `idx`.
         """
-        new_ids = []
-        i = 0
-        while i < len(ids):
-            if i < len(ids) - 1 and (ids[i], ids[i + 1]) == pair:
-                new_ids.append(idx)
-                i += 2
-            else:
-                new_ids.append(ids[i])
-                i += 1
-        return new_ids
+        new_ids_seq = []
+        for ids in ids_seq:
+            new_ids = []
+            i = 0
+            while i < len(ids):
+                if i < len(ids) - 1 and (ids[i], ids[i + 1]) == pair:
+                    new_ids.append(idx)
+                    i += 2
+                else:
+                    new_ids.append(ids[i])
+                    i += 1
+            new_ids_seq.append(new_ids)
+        return new_ids_seq
 
-    def fit(self, train_data: list[int], target_vocab_size: int):
+    def fit(self, train_data: list[list[int]], target_vocab_size: int):
         """
-        Fit the tokenizer on the training data.
+        Fit the tokenizer on `train_data`.
         """
-        if not train_data:
+        if not train_data or not any(train_data):
             error_message = "Training data is empty."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        ids = list(train_data)
-        initial_vocab_size = len(set(ids))
-        max_id = max(ids)
+        ids_seq = train_data
+        set_ids_seq = [set(ids) for ids in ids_seq]
+        set_ids = set.union(*set_ids_seq)
+        initial_vocab_size = len(set_ids)
+        max_id = max(set_ids)
 
         if target_vocab_size <= initial_vocab_size:
             error_message = f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
@@ -59,77 +65,84 @@ class BPETokenizer:
             raise ValueError(error_message)
 
         num_merges = target_vocab_size - initial_vocab_size
-        self.logger.info(f"Performing {num_merges} merges. IDs: {ids}")
+        self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
+        self.logger.debug(f"Initial IDs: {ids_seq}")
 
         for i in range(num_merges):
-            counts = self._get_counts(ids)
+            counts = self._get_counts(ids_seq)
             if not counts:
                 self.logger.warning("No more pairs to merge.")
                 break
             top_pair = max(counts, key=counts.get)
             new_idx = max_id + 1
-            ids = self._merge(ids, top_pair, new_idx)
+            ids_seq = self._merge(ids_seq, top_pair, new_idx)
             self.merges[top_pair] = new_idx
-            self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}; IDs: {ids}")
+            self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}")
+            self.logger.debug(f"IDs: {ids_seq}")
 
             max_id = new_idx
 
-        self.logger.info(f"original length: {len(train_data)} -> bpe length: {len(ids)} (compression rate: {len(ids) / len(train_data):.2f})")
 
-    def encode(self, ids: list[int]) -> list[int]:
+    def encode(self, ids_seq: list[list[int]]) -> list[list[int]]:
         """
-        Encode a sequence of integers with merges.
-        """
-        if not self.merges:
-            error_message = "Tokenizer must be fitted or loaded before encoding."
-            self.logger.error(error_message)
-            raise ValueError(error_message)
-
-        self.logger.info(f"Encoding: {ids}")
-
-        while len(ids) >= 2:
-            counts = self._get_counts(ids)
-            pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
-            if pair_to_merge not in self.merges:
-                break
-            idx = self.merges[pair_to_merge]
-            ids = self._merge(ids, pair_to_merge, idx)
-
-        self.logger.info(f"Encoded: {ids}")
-
-        return ids
-
-    def decode(self, ids: list[int]) -> list[int]:
-        """
-        Decode a sequence of integers with merges.
+        Encode a batch of sequence of integers with merges.
         """
         if not self.merges:
             error_message = "Tokenizer must be fitted or loaded before encoding."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        self.logger.info(f"Decoding: {ids}")
+        self.logger.debug(f"Encoding: {ids_seq}")
+
+        for i, ids in enumerate(ids_seq):
+            while len(ids) >= 2:
+                counts = self._get_counts([ids])
+                pair_to_merge = min(counts, key=lambda pair: self.merges.get(pair, float('inf')))
+                if pair_to_merge not in self.merges:
+                    break
+                idx = self.merges[pair_to_merge]
+                ids = self._merge([ids], pair_to_merge, idx)[0]
+            ids_seq[i] = ids
+
+        self.logger.info("Finished encoding.")
+        self.logger.debug(f"Encoded: {ids_seq}")
+
+        return ids_seq
+
+    def decode(self, ids_seq: list[list[int]]) -> list[list[int]]:
+        """
+        Decode a batch of sequence of integers with merges.
+        """
+        if not self.merges:
+            error_message = "Tokenizer must be fitted or loaded before encoding."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
+        self.logger.debug(f"Decoding: {ids_seq}")
 
         reverse_merges = {v: k for k, v in self.merges.items()}
         
-        ids_set = set(ids)
-        while ids_set & set(reverse_merges.keys()):
-            decoded_ids = []
-            i = 0
-            while i < len(ids):
-                if ids[i] in reverse_merges:
-                    pair = reverse_merges[ids[i]]
-                    decoded_ids.extend(pair)
-                    i += 1
-                else:
-                    decoded_ids.append(ids[i])
-                    i += 1
-            ids = decoded_ids
+        for j, ids in enumerate(ids_seq):
             ids_set = set(ids)
+            while ids_set & set(reverse_merges.keys()):
+                decoded_ids = []
+                i = 0
+                while i < len(ids):
+                    if ids[i] in reverse_merges:
+                        pair = reverse_merges[ids[i]]
+                        decoded_ids.extend(pair)
+                        i += 1
+                    else:
+                        decoded_ids.append(ids[i])
+                        i += 1
+                ids = decoded_ids
+                ids_set = set(ids)
+            ids_seq[j] = ids
 
-        self.logger.info(f"Decoded: {ids}")
+        self.logger.info("Finished decoding.")
+        self.logger.debug(f"Decoded: {ids_seq}")
 
-        return ids
+        return ids_seq
 
     def save(self, json_file: str) -> None:
         """
