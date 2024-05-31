@@ -1,4 +1,5 @@
 from bpe_tokenizer import BPETokenizer
+import os
 
 
 def test_fit():
@@ -59,8 +60,6 @@ def test_save_and_load():
     assert decoded[0] == [0, 1, 0, 1, 2, 3, 4, 5]
 
     # clean up
-    import os
-
     os.remove("test_save_and_load.json")
 
 
@@ -88,9 +87,8 @@ def test_fit_from_file():
     assert tokenizer.merges == {(0, 1): 6, (6, 2): 7, (7, 3): 8, (8, 4): 9}
 
     # clean up
-    import os
-
     os.remove(train_data_file)
+
 
 def test_encode_from_file():
     input_file = "test_encode_from_file_input.txt"
@@ -111,6 +109,11 @@ def test_encode_from_file():
 
     assert encoded == [[6, 9, 5], [7, 8]]
 
+    # clean up
+    os.remove(input_file)
+    os.remove(output_file)
+
+
 def test_decode_from_file():
     input_file = "test_decode_from_file_input.txt"
     output_file = "test_decode_from_file_output.txt"
@@ -129,6 +132,10 @@ def test_decode_from_file():
         decoded = [list(map(int, line.strip().split())) for line in f]
 
     assert decoded == [[0, 1, 0, 1, 2, 3, 4, 5], [0, 1, 2, 0, 1, 2, 3]]
+
+    # clean up
+    os.remove(input_file)
+    os.remove(output_file)
 
 
 def main():
