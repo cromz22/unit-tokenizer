@@ -45,7 +45,7 @@ def test_save_and_load():
 
 def test_batch_encode_decode():
     tokenizer = BPETokenizer()
-    tokenizer.fit(train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]], target_vocab_size=10)
+    tokenizer.fit(train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]], target_vocab_size=10)
     encoded = tokenizer.encode([[0, 1, 0, 1, 2, 3, 4, 5], [0, 1, 2, 0, 1, 2, 3]])
     assert encoded == [[6, 9, 5], [7, 8]]
     decoded = tokenizer.decode(encoded)
