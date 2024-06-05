@@ -1,8 +1,8 @@
-# Unit BPE
+# Unit Tokenizer
 
 ![pytest](https://github.com/cromz22/unit-bpe/actions/workflows/run_pytest.yml/badge.svg)
 
-Plain BPE tokenizer that operates on a sequence of integers.
+Tokenizers that operates on a sequence of integers.
 
 ## Requirements
 
@@ -23,4 +23,4 @@ poetry run pytest
 
 ## Usage
 
-See `test_bpe_tokenizer.py`.
+See `tests/test_bpe_tokenizer.py`.

@@ -1,4 +1,4 @@
-from bpe_tokenizer import BPETokenizer
+from tokenizers import BPETokenizer
 import os
 
 
