@@ -9,7 +9,7 @@ logging.basicConfig(
 
 class BPETokenizer:
     """
-    Pure BPE tokenizer that operates on a sequence of integers.
+    Pure BPE tokenizer that operates on a sequence of units.
     """
 
     def __init__(self) -> None:
@@ -17,13 +17,13 @@ class BPETokenizer:
         self.merges = {}
         self.swapped_merges = {}
 
-    def _get_counts(self, ids_seq: list[list[int]]) -> dict[tuple[int, int], int]:
+    def _get_counts(self, units_list: list[list[int]]) -> dict[tuple[int, int], int]:
         """
-        Count the number of occurrences for each pair of ids within each inner list.
+        Count the number of occurrences for each pair of units within each inner list.
         """
         counts = {}
-        for ids in ids_seq:
-            for pair in zip(ids[:-1], ids[1:]):
+        for units in units_list:
+            for pair in zip(units[:-1], units[1:]):
                 if pair in counts:
                     counts[pair] += 1
                 else:
@@ -31,26 +31,26 @@ class BPETokenizer:
         return counts
 
     def _merge(
-        self, ids_seq: list[list[int]], pair: tuple[int, int], idx: int
+        self, units_list: list[list[int]], pair: tuple[int, int], idx: int
     ) -> list[list[int]]:
         """
-        Replace all occurrences of `pair` in `ids_seq` with `idx`.
+        Replace all occurrences of `pair` in `units_list` with `idx`.
         """
-        new_ids_seq = []
-        for ids in ids_seq:
-            new_ids = []
+        new_units_list = []
+        for units in units_list:
+            new_units = []
             i = 0
-            while i < len(ids):
-                if i < len(ids) - 1 and (ids[i], ids[i + 1]) == pair:
-                    new_ids.append(idx)
+            while i < len(units):
+                if i < len(units) - 1 and (units[i], units[i + 1]) == pair:
+                    new_units.append(idx)
                     i += 2
                 else:
-                    new_ids.append(ids[i])
+                    new_units.append(units[i])
                     i += 1
-            new_ids_seq.append(new_ids)
-        return new_ids_seq
+            new_units_list.append(new_units)
+        return new_units_list
 
-    def fit(self, train_data: list[list[int]], target_vocab_size: int):
+    def fit(self, train_data: list[list[int]], target_vocab_size: int) -> None:
         """
         Fit the tokenizer on `train_data`.
         """
@@ -59,11 +59,11 @@ class BPETokenizer:
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        ids_seq = train_data
-        set_ids_seq = [set(ids) for ids in ids_seq]
-        set_ids = set.union(*set_ids_seq)
-        initial_vocab_size = len(set_ids)
-        max_id = max(set_ids)
+        units_list = train_data
+        set_units_list = [set(units) for units in units_list]
+        set_units = set.union(*set_units_list)
+        initial_vocab_size = len(set_units)
+        max_idx = max(set_units)
 
         if target_vocab_size <= initial_vocab_size:
             error_message = f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
@@ -72,23 +72,23 @@ class BPETokenizer:
 
         num_merges = target_vocab_size - initial_vocab_size
         self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
-        self.logger.debug(f"Initial IDs: {ids_seq}")
+        self.logger.debug(f"Initial units: {units_list}")
 
         for i in range(num_merges):
-            counts = self._get_counts(ids_seq)
+            counts = self._get_counts(units_list)
             if not counts:
                 self.logger.warning("No more pairs to merge.")
                 break
             top_pair = max(counts, key=counts.get)
-            new_idx = max_id + 1
-            ids_seq = self._merge(ids_seq, top_pair, new_idx)
+            new_idx = max_idx + 1
+            units_list = self._merge(units_list, top_pair, new_idx)
             self.merges[top_pair] = new_idx
             self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}")
-            self.logger.debug(f"IDs: {ids_seq}")
+            self.logger.debug(f"units: {units_list}")
 
-            max_id = new_idx
+            max_idx = new_idx
 
-    def fit_from_file(self, train_file: str, target_vocab_size: int):
+    def fit_from_file(self, train_file: str, target_vocab_size: int) -> None:
         """
         Fit the tokenizer from a file.
         `train_file` should contain a sequence of integers separated by spaces per line.
@@ -97,7 +97,7 @@ class BPETokenizer:
             train_data = [list(map(int, line.strip().split())) for line in f]
         self.fit(train_data, target_vocab_size)
 
-    def encode(self, ids_seq: list[list[int]]) -> list[list[int]]:
+    def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
         Encode a batch of sequence of integers with merges.
         """
@@ -106,24 +106,24 @@ class BPETokenizer:
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        self.logger.debug(f"Encoding: {ids_seq}")
+        self.logger.debug(f"Encoding: {units_list}")
 
-        for i, ids in enumerate(ids_seq):
-            while len(ids) >= 2:
-                counts = self._get_counts([ids])
+        for i, units in enumerate(units_list):
+            while len(units) >= 2:
+                counts = self._get_counts([units])
                 pair_to_merge = min(
                     counts, key=lambda pair: self.merges.get(pair, float("inf"))
                 )
                 if pair_to_merge not in self.merges:
                     break
                 idx = self.merges[pair_to_merge]
-                ids = self._merge([ids], pair_to_merge, idx)[0]
-            ids_seq[i] = ids
+                units = self._merge([units], pair_to_merge, idx)[0]
+            units_list[i] = units
 
         self.logger.info("Finished encoding.")
-        self.logger.debug(f"Encoded: {ids_seq}")
+        self.logger.debug(f"Encoded: {units_list}")
 
-        return ids_seq
+        return units_list
 
     def encode_from_file(self, input_file: str, output_file: str) -> None:
         """
@@ -132,13 +132,13 @@ class BPETokenizer:
         `output_file` will contain the encoded sequences.
         """
         with open(input_file, "r") as f:
-            ids_seq = [list(map(int, line.strip().split())) for line in f]
-        encoded_ids_seq = self.encode(ids_seq)
+            units_list = [list(map(int, line.strip().split())) for line in f]
+        encoded_units_list = self.encode(units_list)
         with open(output_file, "w") as f:
-            for ids in encoded_ids_seq:
+            for ids in encoded_units_list:
                 f.write(" ".join(map(str, ids)) + "\n")
 
-    def decode(self, ids_seq: list[list[int]]) -> list[list[int]]:
+    def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
         Decode a batch of sequence of integers with merges.
         """
@@ -147,32 +147,32 @@ class BPETokenizer:
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        self.logger.debug(f"Decoding: {ids_seq}")
+        self.logger.debug(f"Decoding: {units_list}")
 
         if not self.swapped_merges:
             self.swapped_merges = {v: k for k, v in self.merges.items()}
 
-        for j, ids in enumerate(ids_seq):
-            ids_set = set(ids)
-            while ids_set & set(self.swapped_merges.keys()):
-                decoded_ids = []
+        for j, units in enumerate(units_list):
+            set_units = set(units)
+            while set_units & set(self.swapped_merges.keys()):
+                decoded_units = []
                 i = 0
-                while i < len(ids):
-                    if ids[i] in self.swapped_merges:
-                        pair = self.swapped_merges[ids[i]]
-                        decoded_ids.extend(pair)
+                while i < len(units):
+                    if units[i] in self.swapped_merges:
+                        pair = self.swapped_merges[units[i]]
+                        decoded_units.extend(pair)
                         i += 1
                     else:
-                        decoded_ids.append(ids[i])
+                        decoded_units.append(units[i])
                         i += 1
-                ids = decoded_ids
-                ids_set = set(ids)
-            ids_seq[j] = ids
+                units = decoded_units
+                set_units = set(units)
+            units_list[j] = units
 
         self.logger.info("Finished decoding.")
-        self.logger.debug(f"Decoded: {ids_seq}")
+        self.logger.debug(f"Decoded: {units_list}")
 
-        return ids_seq
+        return units_list
 
     def decode_from_file(self, input_file: str, output_file: str) -> None:
         """
@@ -181,11 +181,11 @@ class BPETokenizer:
         `output_file` will contain the decoded sequences.
         """
         with open(input_file, "r") as f:
-            ids_seq = [list(map(int, line.strip().split())) for line in f]
-        decoded_ids_seq = self.decode(ids_seq)
+            units_list = [list(map(int, line.strip().split())) for line in f]
+        decoded_units_list = self.decode(units_list)
         with open(output_file, "w") as f:
-            for ids in decoded_ids_seq:
-                f.write(" ".join(map(str, ids)) + "\n")
+            for units in decoded_units_list:
+                f.write(" ".join(map(str, units)) + "\n")
 
     def save(self, json_file: str) -> None:
         """
