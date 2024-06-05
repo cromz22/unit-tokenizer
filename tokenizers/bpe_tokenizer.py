@@ -1,7 +1,7 @@
-import logging
 import json
-from tokenizers import BaseTokenizer
+import logging
 
+from tokenizers import BaseTokenizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

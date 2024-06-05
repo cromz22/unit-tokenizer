@@ -1,5 +1,6 @@
-from tokenizers import BPETokenizer
 import os
+
+from tokenizers import BPETokenizer
 
 
 def test_fit():
