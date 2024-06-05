@@ -1,5 +1,5 @@
 import logging
-import json
+from tokenizers import BaseTokenizer
 
 
 logging.basicConfig(
@@ -7,7 +7,7 @@ logging.basicConfig(
 )
 
 
-class RLETokenizer:
+class RLETokenizer(BaseTokenizer):
     """
     Run Length Encoding Tokenizer that operates on a sequence of units.
     First max_consecutive_length units (0, ..., max_consecutive_length - 1) are reserved to denote the length of consecutive units. (0 is actually not used.)
