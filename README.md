@@ -23,4 +23,4 @@ poetry run pytest
 
 ## Usage
 
-See `tests/test_bpe_tokenizer.py`.
+See `tests/*.py`.

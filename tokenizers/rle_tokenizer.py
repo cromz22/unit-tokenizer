@@ -26,3 +26,14 @@ class RLETokenizer:
         encoded.append(consecutive)
         encoded.append(units[-1])
         return encoded
+
+    def decode(self, encoded: list[int]):
+        """
+        Decode a sequence of encoded units.
+        """
+        units = []
+        for i in range(0, len(encoded), 2):
+            consecutive = encoded[i]
+            unit = encoded[i + 1]
+            units.extend([unit - self.max_consecutive_length] * consecutive)
+        return units
