@@ -18,7 +18,7 @@ class RLETokenizer:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.max_consecutive_length = 100
 
-    def encode(self, units: list[int]) -> list[int]:
+    def _encode(self, units: list[int]) -> list[int]:
         """
         Encode a sequence of units.
         """
@@ -43,7 +43,13 @@ class RLETokenizer:
 
         return encoded
 
-    def decode(self, encoded: list[int]) -> list[int]:
+    def encode(self, units_list: list[list[int]]) -> list[list[int]]:
+        """
+        Encode sequences of units.
+        """
+        return [self._encode(units) for units in units_list]
+
+    def _decode(self, encoded: list[int]) -> list[int]:
         """
         Decode a sequence of encoded units.
         """
@@ -53,3 +59,9 @@ class RLETokenizer:
             unit = encoded[i + 1]
             units.extend([unit - self.max_consecutive_length] * consecutive)
         return units
+
+    def decode(self, encoded_list: list[list[int]]) -> list[list[int]]:
+        """
+        Decode sequences of encoded units.
+        """
+        return [self._decode(encoded) for encoded in encoded_list]
