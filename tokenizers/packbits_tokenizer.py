@@ -56,6 +56,17 @@ class PackBitsTokenizer(BaseTokenizer):
 
         return encoded
 
+    def encode(self, units_list: list[list[int]]) -> list[list[int]]:
+        """
+        Encode sequences of units.
+        """
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
+        return [self._encode(units) for units in units_list]
+
     def _decode(self, units: list[int]) -> list[int]:
         """
         Decode a sequence of encoded units.
@@ -75,3 +86,14 @@ class PackBitsTokenizer(BaseTokenizer):
                 i += 2
 
         return [unit - self.max_consecutive_length for unit in decoded]
+
+    def decode(self, units_list: list[list[int]]) -> list[list[int]]:
+        """
+        Decode sequences of encoded units.
+        """
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
+        return [self._decode(units) for units in units_list]
