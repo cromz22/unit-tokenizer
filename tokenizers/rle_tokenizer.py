@@ -60,8 +60,8 @@ class RLETokenizer(BaseTokenizer):
             units.extend([unit - self.max_consecutive_length] * consecutive)
         return units
 
-    def decode(self, encoded_list: list[list[int]]) -> list[list[int]]:
+    def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
         Decode sequences of encoded units.
         """
-        return [self._decode(encoded) for encoded in encoded_list]
+        return [self._decode(encoded) for encoded in units_list]

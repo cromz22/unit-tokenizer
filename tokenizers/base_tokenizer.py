@@ -6,10 +6,10 @@ class BaseTokenizer:
     def __init__(self):
         pass
 
-    def encode(self, units: list[list[int]]) -> list[list[int]]:
+    def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         raise NotImplementedError
 
-    def decode(self, units: list[list[int]]) -> list[list[int]]:
+    def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         raise NotImplementedError
 
     def encode_from_file(self, input_file: str, output_file: str) -> None:
