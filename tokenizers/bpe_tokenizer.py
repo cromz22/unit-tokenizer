@@ -107,6 +107,11 @@ class BPETokenizer(BaseTokenizer):
             self.logger.error(error_message)
             raise ValueError(error_message)
 
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
         self.logger.debug(f"Encoding: {units_list}")
 
         for i, units in enumerate(units_list):
@@ -132,6 +137,11 @@ class BPETokenizer(BaseTokenizer):
         """
         if not self.merges:
             error_message = "Tokenizer must be fitted or loaded before encoding."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
             self.logger.error(error_message)
             raise ValueError(error_message)
 

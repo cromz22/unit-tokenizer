@@ -47,6 +47,11 @@ class RLETokenizer(BaseTokenizer):
         """
         Encode sequences of units.
         """
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
         return [self._encode(units) for units in units_list]
 
     def _decode(self, encoded: list[int]) -> list[int]:
@@ -64,4 +69,9 @@ class RLETokenizer(BaseTokenizer):
         """
         Decode sequences of encoded units.
         """
+        if not all(isinstance(units, list) for units in units_list):
+            error_message = "Input should be of type list[list[int]]"
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+
         return [self._decode(encoded) for encoded in units_list]
