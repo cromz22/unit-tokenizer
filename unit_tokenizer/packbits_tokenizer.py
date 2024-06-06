@@ -42,17 +42,19 @@ class PackBitsTokenizer(BaseTokenizer):
                 run_length += 1
 
             if run_length > 1:
-                encoded.append(run_length)
-                encoded.append(units[i])
+                encoded.extend([run_length, units[i]])
                 i += run_length
             else:
                 start = i
                 while i < n and (i + 1 >= n or units[i] != units[i + 1]):
                     i += 1
                 if i > start:
-                    encoded.append(self.uncompressed_marker)
-                    encoded.append(i - start)
-                    encoded.extend(units[start:i])
+                    encoded.extend(
+                        [self.uncompressed_marker, i - start, *units[start:i]]
+                    )
+
+        self.logger.info("Finished encoding.")
+        self.logger.debug(f"Encoded: {encoded}")
 
         return encoded
 

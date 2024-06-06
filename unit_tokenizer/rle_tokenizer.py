@@ -27,16 +27,20 @@ class RLETokenizer(BaseTokenizer):
         units = [unit + self.max_consecutive_length for unit in units]
 
         encoded = []
-        consecutive = 1
-        for i in range(1, len(units)):
-            if units[i] == units[i - 1]:
-                consecutive += 1
+        i = 0
+        n = len(units)
+
+        while i < n:
+            run_length = 1
+            while i + run_length < n and units[i] == units[i + run_length]:
+                run_length += 1
+
+            if run_length > 1:
+                encoded.extend([run_length, units[i]])
+                i += run_length
             else:
-                encoded.append(consecutive)
-                encoded.append(units[i - 1])
-                consecutive = 1
-        encoded.append(consecutive)
-        encoded.append(units[-1])
+                encoded.extend([1, units[i]])
+                i += 1
 
         self.logger.info("Finished encoding.")
         self.logger.debug(f"Encoded: {encoded}")
