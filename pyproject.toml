@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "unit-bpe"
+name = "unit-tokenizer"
 version = "0.1.0"
-description = "Plain BPE tokenizer that operates on integer sequences."
+description = "Tokenizers that operate on integer sequences."
 authors = ["Shuichiro Shimizu"]
 license = "MIT"
 readme = "README.md"
