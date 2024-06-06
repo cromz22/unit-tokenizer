@@ -1,6 +1,6 @@
 # Unit Tokenizer
 
-![pytest](https://github.com/cromz22/unit-bpe/actions/workflows/run_pytest.yml/badge.svg)
+![pytest](https://github.com/cromz22/unit-tokenizer/actions/workflows/run_pytest.yml/badge.svg)
 
 Tokenizers that operate on a sequence of integers.
 
