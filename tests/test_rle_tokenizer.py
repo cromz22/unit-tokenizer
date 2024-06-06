@@ -1,6 +1,6 @@
 import os
 
-from tokenizers import RLETokenizer
+from unit_tokenizer import RLETokenizer
 
 
 def test_encode():

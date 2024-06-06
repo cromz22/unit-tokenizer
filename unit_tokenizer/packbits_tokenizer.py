@@ -1,6 +1,6 @@
 import logging
 
-from tokenizers import BaseTokenizer
+from unit_tokenizer import BaseTokenizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

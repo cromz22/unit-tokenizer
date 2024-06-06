@@ -1,6 +1,6 @@
 import os
 
-from tokenizers import PackBitsTokenizer
+from unit_tokenizer import PackBitsTokenizer
 
 
 def test_encode():
