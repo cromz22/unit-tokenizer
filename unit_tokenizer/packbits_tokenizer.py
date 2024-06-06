@@ -28,7 +28,6 @@ class PackBitsTokenizer(BaseTokenizer):
         """
         Encode a sequence of units.
         """
-        self.logger.debug(f"Encoding: {units}")
 
         units = [unit + self.max_consecutive_length for unit in units]
 
@@ -53,9 +52,6 @@ class PackBitsTokenizer(BaseTokenizer):
                         [self.uncompressed_marker, i - start, *units[start:i]]
                     )
 
-        self.logger.info("Finished encoding.")
-        self.logger.debug(f"Encoded: {encoded}")
-
         return encoded
 
     def encode(self, units_list: list[list[int]]) -> list[list[int]]:
@@ -67,7 +63,14 @@ class PackBitsTokenizer(BaseTokenizer):
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        return [self._encode(units) for units in units_list]
+        self.logger.debug(f"Encoding: {units_list}")
+
+        encoded_list = [self._encode(units) for units in units_list]
+
+        self.logger.info("Finished encoding.")
+        self.logger.debug(f"Encoded: {encoded_list}")
+
+        return encoded_list
 
     def _decode(self, units: list[int]) -> list[int]:
         """
@@ -98,4 +101,11 @@ class PackBitsTokenizer(BaseTokenizer):
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        return [self._decode(units) for units in units_list]
+        self.logger.debug(f"Decoding: {units_list}")
+
+        decoded_list = [self._decode(encoded) for encoded in units_list]
+
+        self.logger.info("Finished decoding.")
+        self.logger.debug(f"Decoded: {decoded_list}")
+
+        return decoded_list
