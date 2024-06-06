@@ -8,6 +8,17 @@ Tokenizers that operate on a sequence of integers.
 
 - Python >= 3.9 (because of type hinting syntax)
 
+## Features
+
+- BPETokenizer
+    - Byte-pair encoding algorithm
+
+- RLETokenizer
+    - Run-length encoding algorithm
+
+- PackBitsTokenizer
+    - Modified run-length encoding algorithm
+
 ## Installation for development
 
 ```
