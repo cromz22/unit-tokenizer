@@ -10,20 +10,21 @@ logging.basicConfig(
 class RLETokenizer(BaseTokenizer):
     """
     Run Length Encoding Tokenizer that operates on a sequence of units.
-    First max_consecutive_length units (0, ..., max_consecutive_length - 1) are reserved to denote the length of consecutive units. (0 is actually not used.)
-    Unit numbers are shifted by max_consecutive_length to avoid conflict with the reserved units.
+    First max_run_length units (0, ..., max_run_length - 1) are reserved to denote run length (number of consecutive units of the same value).
+    (0 is actually not used.)
+    Unit numbers are shifted by max_run_length to avoid conflict with the reserved units.
     """
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.max_consecutive_length = 100
+        self.max_run_length = 100
 
     def _encode(self, units: list[int]) -> list[int]:
         """
         Encode a sequence of units.
         """
 
-        units = [unit + self.max_consecutive_length for unit in units]
+        units = [unit + self.max_run_length for unit in units]
 
         encoded = []
         i = 0
@@ -67,9 +68,9 @@ class RLETokenizer(BaseTokenizer):
         """
         units = []
         for i in range(0, len(encoded), 2):
-            consecutive = encoded[i]
+            run_length = encoded[i]
             unit = encoded[i + 1]
-            units.extend([unit - self.max_consecutive_length] * consecutive)
+            units.extend([unit - self.max_run_length] * run_length)
         return units
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:

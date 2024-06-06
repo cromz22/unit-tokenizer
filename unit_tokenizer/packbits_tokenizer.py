@@ -10,9 +10,9 @@ logging.basicConfig(
 class PackBitsTokenizer(BaseTokenizer):
     """
     PackBits tokenizer that operates on a sequence of units.
-    First max_consecutive_length units (0, ..., max_consecutive_length - 1) are reserved to denote the length of consecutive units.
+    First max_run_length units (0, ..., max_run_length - 1) are reserved to denote run length (number of consecutive units of the same value).
     0 is reserved as the special token to denote that the units after the next unit cannot be compressed.
-    Unit numbers are shifted by max_consecutive_length to avoid conflict with the reserved units.
+    Unit numbers are shifted by max_run_length to avoid conflict with the reserved units.
     Example:
         Original units: 0 0 0 0 1 1 2 2 2 2 2 2 3 4 5 6
         Shifted units: 100 100 100 100 101 101 102 102 102 102 102 102 103 104 105 106
@@ -22,14 +22,14 @@ class PackBitsTokenizer(BaseTokenizer):
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.uncompressed_marker = 0
-        self.max_consecutive_length = 100
+        self.max_run_length = 100
 
     def _encode(self, units: list[int]) -> list[int]:
         """
         Encode a sequence of units.
         """
 
-        units = [unit + self.max_consecutive_length for unit in units]
+        units = [unit + self.max_run_length for unit in units]
 
         encoded = []
         i = 0
@@ -90,7 +90,7 @@ class PackBitsTokenizer(BaseTokenizer):
                 decoded.extend([units[i + 1]] * run_length)
                 i += 2
 
-        return [unit - self.max_consecutive_length for unit in decoded]
+        return [unit - self.max_run_length for unit in decoded]
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
