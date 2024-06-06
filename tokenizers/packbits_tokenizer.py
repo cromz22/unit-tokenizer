@@ -55,3 +55,23 @@ class PackBitsTokenizer(BaseTokenizer):
                     encoded.extend(units[start:i])
 
         return encoded
+
+    def _decode(self, units: list[int]) -> list[int]:
+        """
+        Decode a sequence of encoded units.
+        """
+        decoded = []
+        i = 0
+        n = len(units)
+
+        while i < n:
+            if units[i] == self.uncompressed_marker:
+                run_length = units[i + 1]
+                decoded.extend(units[i + 2 : i + 2 + run_length])
+                i += 2 + run_length
+            else:
+                run_length = units[i]
+                decoded.extend([units[i + 1]] * run_length)
+                i += 2
+
+        return [unit - self.max_consecutive_length for unit in decoded]
