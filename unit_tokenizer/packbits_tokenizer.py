@@ -13,16 +13,17 @@ class PackBitsTokenizer(BaseTokenizer):
     First max_run_length units (0, ..., max_run_length - 1) are reserved to denote run length (number of consecutive units of the same value).
     0 is reserved as the special token to denote that the units after the next unit cannot be compressed.
     Unit numbers are shifted by max_run_length to avoid conflict with the reserved units.
+    If the run length exceeds max_run_length, the sequence will be separated by max_run_length (e.g., 15 consecutive elements are separated to 10 and 5 when max_run_length=10)
     Example:
         Original units: 0 0 0 0 1 1 2 2 2 2 2 2 3 4 5 6
         Shifted units: 100 100 100 100 101 101 102 102 102 102 102 102 103 104 105 106
         Encoded units: 4 100 2 101 6 102 0 4 103 104 105 106
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_run_length=100) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.uncompressed_marker = 0
-        self.max_run_length = 100
+        self.max_run_length = max_run_length
 
     def _encode(self, units: list[int]) -> list[int]:
         """
@@ -40,10 +41,7 @@ class PackBitsTokenizer(BaseTokenizer):
             while i + run_length < n and units[i] == units[i + run_length]:
                 run_length += 1
 
-            if run_length > 1:
-                encoded.extend([run_length, units[i]])
-                i += run_length
-            else:
+            if run_length == 1:
                 start = i
                 while i < n and (i + 1 >= n or units[i] != units[i + 1]):
                     i += 1
@@ -51,6 +49,12 @@ class PackBitsTokenizer(BaseTokenizer):
                     encoded.extend(
                         [self.uncompressed_marker, i - start, *units[start:i]]
                     )
+            elif run_length > 1 and run_length <= self.max_run_length:
+                encoded.extend([run_length, units[i]])
+                i += run_length
+            else:
+                encoded.extend([self.max_run_length, units[i]])
+                i += self.max_run_length
 
         return encoded
 
