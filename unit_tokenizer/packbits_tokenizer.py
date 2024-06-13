@@ -22,11 +22,16 @@ class PackBitsTokenizer(BaseTokenizer):
         self.max_run_length = max_run_length
         self.shift = shift
         assert self.max_run_length < self.shift
+        if self.max_run_length + 1 != self.shift:
+            self.logger.warning(
+                f"shift ({self.shift}) should be max_run_length + 1 ({self.max_run_length + 1}) for optimal resource usage."
+            )
 
     def _encode(self, units: list[int]) -> list[int]:
         """
         Encode a sequence of units.
         """
+        assert all(unit >= 0 for unit in units)
 
         units = [unit + self.shift for unit in units]
 
