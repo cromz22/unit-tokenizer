@@ -10,22 +10,23 @@ logging.basicConfig(
 class RLETokenizer(BaseTokenizer):
     """
     Run Length Encoding Tokenizer that operates on a sequence of units.
-    First max_run_length units (0, ..., max_run_length - 1) are reserved to denote run length (number of consecutive units of the same value).
-    (0 is actually not used.)
-    Unit numbers are shifted by max_run_length to avoid conflict with the reserved units.
-    If the run length exceeds max_run_length, the sequence will be separated by max_run_length (e.g., 15 consecutive elements are separated to 10 and 5 when max_run_length=10)
+    First `max_run_length` units (1, ..., max_run_length) are reserved to denote run length (i.e., the number of consecutive units of the same value). (Note: 0 is not used in this algorithm.)
+    Unit numbers are shifted by `shift` (usually set to max_run_length + 1) to avoid conflict with the reserved units. (Note: This is because the algorithm is targeted for integer encoding alphabets and each integer is meant to have a unique "meaning" in the encoded sequence.)
+    If the run length exceeds max_run_length, the sequence will be separated by max_run_length. (e.g., 15 consecutive elements are separated to 10 and 5 when max_run_length=10.)
     """
 
-    def __init__(self, max_run_length=100) -> None:
+    def __init__(self, max_run_length=99, shift=100) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.max_run_length = max_run_length
+        self.shift = shift
+        assert self.max_run_length < self.shift
 
     def _encode(self, units: list[int]) -> list[int]:
         """
         Encode a sequence of units.
         """
 
-        units = [unit + self.max_run_length for unit in units]
+        units = [unit + self.shift for unit in units]
 
         encoded = []
         i = 0
@@ -70,7 +71,7 @@ class RLETokenizer(BaseTokenizer):
         for i in range(0, len(encoded), 2):
             run_length = encoded[i]
             unit = encoded[i + 1]
-            units.extend([unit - self.max_run_length] * run_length)
+            units.extend([unit - self.shift] * run_length)
         return units
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
