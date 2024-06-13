@@ -13,11 +13,12 @@ class RLETokenizer(BaseTokenizer):
     First max_run_length units (0, ..., max_run_length - 1) are reserved to denote run length (number of consecutive units of the same value).
     (0 is actually not used.)
     Unit numbers are shifted by max_run_length to avoid conflict with the reserved units.
+    If the run length exceeds max_run_length, the sequence will be separated by max_run_length (e.g., 15 consecutive elements are separated to 10 and 5 when max_run_length=10)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_run_length=100) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.max_run_length = 100
+        self.max_run_length = max_run_length
 
     def _encode(self, units: list[int]) -> list[int]:
         """
@@ -35,12 +36,11 @@ class RLETokenizer(BaseTokenizer):
             while i + run_length < n and units[i] == units[i + run_length]:
                 run_length += 1
 
-            if run_length > 1:
-                encoded.extend([run_length, units[i]])
-                i += run_length
-            else:
-                encoded.extend([1, units[i]])
-                i += 1
+            if run_length > self.max_run_length:
+                run_length = self.max_run_length
+
+            encoded.extend([run_length, units[i]])
+            i += run_length
 
         return encoded
 

@@ -32,6 +32,20 @@ def test_batch_decode():
     assert decoded == [[0, 1, 2, 2, 3, 3, 3], [0, 1, 1, 2, 2, 2, 3, 3, 3, 3]]
 
 
+def test_max_run_length_encode():
+    tokenizer = RLETokenizer(max_run_length=10)
+    encoded = tokenizer.encode(
+        [[0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3], [3, 3, 3]]
+    )
+    assert encoded == [[1, 10, 1, 11, 1, 12, 10, 13, 2, 13], [3, 13]]
+
+
+def test_max_run_length_decode():
+    tokenizer = RLETokenizer(max_run_length=10)
+    decoded = tokenizer.decode([[1, 10, 1, 11, 1, 12, 10, 13, 2, 13], [3, 13]])
+    assert decoded == [[0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3], [3, 3, 3]]
+
+
 def test_encode_from_file():
     input_file = "test_encode_from_file_input.txt"
     output_file = "test_encode_from_file_output.txt"
