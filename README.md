@@ -19,6 +19,15 @@ Tokenizers that operate on integer sequences.
 - PackBitsTokenizer
     - Modified run-length encoding algorithm
 
+- NaivePackBitsTokenizer
+    - PackBitsTokenizer that allows negative units
+
+## Installation
+
+```
+pip install unit-tokenizer
+```
+
 ## Installation for development
 
 ```
