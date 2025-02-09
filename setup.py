@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="unit-tokenizer",
-    version="0.1.0",
+    version="0.1.1",
     author="Shuichiro Shimizu",
     author_email="sshimizu@nlp.ist.i.kyoto-u.ac.jp",
     description="Tokenizers that operate on integer sequences.",
