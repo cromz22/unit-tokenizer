@@ -1,5 +1,6 @@
 import json
 import logging
+import heapq
 from collections import defaultdict
 from unit_tokenizer import BaseTokenizer
 
@@ -21,16 +22,14 @@ class Node:
 class FastBPETokenizer(BaseTokenizer):
     """
     Fast BPE Tokenizer that operates on batches of integer sequences using local updates.
+    This version leverages a priority queue to efficiently choose the most frequent pair.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
-        # Mapping from pair (a, b) to merged token.
         self.merges: dict[tuple[int, int], int] = {}
-        # The ordered list of learned merge rules as tuples: ((a, b), new_token).
         self.merge_order: list[tuple[tuple[int, int], int]] = []
-        # Reverse mapping for decoding: merged token -> (a, b).
         self.swapped_merges: dict[int, tuple[int, int]] = {}
 
     @staticmethod
@@ -57,19 +56,16 @@ class FastBPETokenizer(BaseTokenizer):
     def fit(self, train_data: list[list[int]], target_vocab_size: int) -> None:
         """
         Learn merge rules from training data until the target vocabulary size is reached.
+        This version uses a priority queue to extract the best pair in O(log n) time.
         """
         if not train_data or not any(train_data):
             error_message = "Training data is empty."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        # Compute the initial vocabulary.
-        set_units = set()
-        for seq in train_data:
-            set_units |= set(seq)
-        initial_vocab_size = len(set_units)
-        max_idx = max(set_units)
-
+        # Determine initial vocabulary.
+        initial_vocab = {token for seq in train_data for token in seq}
+        initial_vocab_size = len(initial_vocab)
         if target_vocab_size <= initial_vocab_size:
             error_message = (
                 f"Target vocab size ({target_vocab_size}) must be greater than "
@@ -81,65 +77,91 @@ class FastBPETokenizer(BaseTokenizer):
         num_merges = target_vocab_size - initial_vocab_size
         self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
 
-        # Convert each sequence to a linked list.
+        # Build linked lists for each sequence.
         linked_sequences = [self._build_linked_list(seq) for seq in train_data]
 
-        # Build a dictionary mapping adjacent pairs to the set of left-hand nodes.
+        # Map each adjacent pair to the set of left nodes.
         pairs: dict[tuple[int, int], set[Node]] = defaultdict(set)
         for head in linked_sequences:
             node = head
-            while node is not None and node.next is not None:
-                pairs[(node.token, node.next.token)].add(node)
+            while node and node.next:
+                if node.active and node.next.active:
+                    pairs[(node.token, node.next.token)].add(node)
                 node = node.next
 
-        # Perform merges.
-        for i in range(num_merges):
+        merge_rules = []
+        next_new_token = max(initial_vocab) + 1
+
+        # Build a count dictionary and a max-heap (using negative counts).
+        pairs_count = {pair: len(nodes) for pair, nodes in pairs.items()}
+        priority_queue = []
+        for pair, count in pairs_count.items():
+            heapq.heappush(priority_queue, (-count, pair))
+
+        for merge_index in range(num_merges):
             best_pair = None
             best_count = 0
-            # Clean up and choose the most frequent valid pair.
-            for pair in list(pairs.keys()):
-                valid_nodes = {
-                    node
-                    for node in pairs[pair]
-                    if node.active
-                    and node.next
-                    and node.next.active
-                    and (node.token, node.next.token) == pair
-                }
-                if valid_nodes:
-                    pairs[pair] = valid_nodes
-                    count = len(valid_nodes)
-                    if count > best_count:
-                        best_count = count
-                        best_pair = pair
-                else:
-                    del pairs[pair]
+
+            # Extract the pair with the highest frequency.
+            while priority_queue:
+                neg_count, pair = heapq.heappop(priority_queue)
+                count = -neg_count
+                # Check if this count is up-to-date.
+                if pairs_count.get(pair, 0) == count:
+                    best_pair = pair
+                    best_count = count
+                    break
+
             if best_pair is None or best_count == 0:
-                self.logger.warning("No more pairs to merge.")
+                self.logger.warning("No more valid pairs to merge.")
                 break
 
-            new_token = max_idx + 1
-            max_idx = new_token
+            a, b = best_pair
+            new_token = next_new_token
+            next_new_token += 1
+            merge_rules.append((best_pair, new_token))
             self.merges[best_pair] = new_token
-            self.merge_order.append((best_pair, new_token))
-            self.logger.info(f"Merge {i+1}/{num_merges}: {best_pair} -> {new_token}")
+            self.logger.info(f"Merge {merge_index+1}/{num_merges}: {best_pair} -> {new_token}")
 
-            # For each valid occurrence of best_pair, merge the nodes.
+            update_count_pairs = set()
+
+            # Process all valid occurrences of best_pair.
             for node in list(pairs[best_pair]):
                 if not (node.active and node.next and node.next.active and (node.token, node.next.token) == best_pair):
                     continue
                 node.token = new_token
                 removed = node.next
-                removed.active = False
                 node.next = removed.next
                 if removed.next:
                     removed.next.prev = node
-                # Update pairs for affected neighboring nodes.
-                if node.prev and node.prev.active:
-                    pairs[(node.prev.token, node.token)].add(node.prev)
-                if node.next and node.next.active:
-                    pairs[(node.token, node.next.token)].add(node)
-            del pairs[best_pair]
+
+                # Update neighboring pairs.
+                if node.prev:
+                    old_pair = (node.prev.token, a)
+                    if node.prev in pairs[old_pair]:
+                        pairs[old_pair].discard(node.prev)
+                        update_count_pairs.add(old_pair)
+                    new_pair = (node.prev.token, node.token)
+                    pairs[new_pair].add(node.prev)
+                    update_count_pairs.add(new_pair)
+                if node.next:
+                    new_pair = (node.token, node.next.token)
+                    pairs[new_pair].add(node)
+                    update_count_pairs.add(new_pair)
+                    old_pair = (b, node.next.token)
+                    if removed in pairs[old_pair]:
+                        pairs[old_pair].discard(removed)
+                        update_count_pairs.add(old_pair)
+
+            # Refresh counts in the priority queue for affected pairs.
+            for pair in update_count_pairs:
+                pairs_count[pair] = len(pairs[pair])
+                heapq.heappush(priority_queue, (-pairs_count[pair], pair))
+            pairs_count[best_pair] = 0
+
+        # Store the merge order.
+        self.merge_order = merge_rules
+        self.logger.info("Finished fitting tokenizer.")
 
     def fit_from_file(self, train_file: str, target_vocab_size: int) -> None:
         """
