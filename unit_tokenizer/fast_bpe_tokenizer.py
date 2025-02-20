@@ -171,67 +171,51 @@ class FastBPETokenizer(BaseTokenizer):
         with open(train_file, "r") as f:
             train_data = [list(map(int, line.strip().split())) for line in f]
         self.fit(train_data, target_vocab_size)
-
+    
     def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Encode a batch of integer sequences by applying each learned merge rule in order.
+        For each sequence, apply the learned merge rules in order.
         """
-        if not self.merge_order:
-            error_message = "Tokenizer must be fitted or loaded before encoding."
-            self.logger.error(error_message)
-            raise ValueError(error_message)
-
-        # Work on a copy of the input.
-        encoded = [seq[:] for seq in units_list]
-        for pair, new_token in self.merge_order:
-            for i in range(len(encoded)):
-                seq = encoded[i]
-                new_seq = []
-                j = 0
-                while j < len(seq):
-                    if j < len(seq) - 1 and (seq[j], seq[j + 1]) == pair:
-                        new_seq.append(new_token)
-                        j += 2
+        encoded_sequences = []
+        for sequence in units_list:
+            tokens = sequence.copy()
+            for (a, b), new_token in self.merge_order:
+                i = 0
+                new_tokens = []
+                # Scan tokens left-to-right merging every occurrence of (a, b)
+                while i < len(tokens):
+                    if i < len(tokens) - 1 and tokens[i] == a and tokens[i + 1] == b:
+                        new_tokens.append(new_token)
+                        i += 2
                     else:
-                        new_seq.append(seq[j])
-                        j += 1
-                encoded[i] = new_seq
-        self.logger.info("Finished encoding.")
-        return encoded
+                        new_tokens.append(tokens[i])
+                        i += 1
+                tokens = new_tokens
+            encoded_sequences.append(tokens)
+        return encoded_sequences
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Decode a batch of integer sequences by recursively expanding merged tokens.
+        Recursively expand merged tokens using the stored swapped_merges.
         """
-        if not self.merges:
-            error_message = "Tokenizer must be fitted or loaded before decoding."
-            self.logger.error(error_message)
-            raise ValueError(error_message)
-
         if not self.swapped_merges:
             self.swapped_merges = {v: k for k, v in self.merges.items()}
 
-        memo: dict[int, list[int]] = {}
-
         def recursive_decode(token: int) -> list[int]:
-            if token in memo:
-                return memo[token]
             if token in self.swapped_merges:
                 a, b = self.swapped_merges[token]
-                result = recursive_decode(a) + recursive_decode(b)
+                return recursive_decode(a) + recursive_decode(b)
             else:
-                result = [token]
-            memo[token] = result
-            return result
+                return [token]
 
-        decoded = []
-        for seq in units_list:
-            new_seq: list[int] = []
-            for token in seq:
-                new_seq.extend(recursive_decode(token))
-            decoded.append(new_seq)
-        self.logger.info("Finished decoding.")
-        return decoded
+        decoded_sequences = []
+        for sequence in units_list:
+            decoded_sequence = []
+            for token in sequence:
+                decoded_sequence.extend(recursive_decode(token))
+            decoded_sequences.append(decoded_sequence)
+        return decoded_sequences
+
 
     def save(self, json_file: str) -> None:
         """
