@@ -33,10 +33,10 @@ class FastBPETokenizer(BaseTokenizer):
         self.swapped_merges: dict[int, tuple[int, int]] = {}
 
     @staticmethod
-    def _build_linked_list(seq: list[int]) -> Node:
-        head = Node(seq[0])
+    def _build_linked_list(units: list[int]) -> Node:
+        head = Node(units[0])
         current = head
-        for unit in seq[1:]:
+        for unit in units[1:]:
             new_node = Node(unit)
             new_node.prev = current
             current.next = new_node
@@ -78,22 +78,22 @@ class FastBPETokenizer(BaseTokenizer):
         self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
 
         # Build linked lists for each sequence.
-        linked_units_list = [self._build_linked_list(units) for units in units_list]
+        linked_units_list: list[Node] = [self._build_linked_list(units) for units in units_list]
 
         # Map each adjacent pair to the set of left nodes.
-        pairs: dict[tuple[int, int], set[Node]] = defaultdict(set)
+        pairs_positions: dict[tuple[int, int], set[Node]] = defaultdict(set)
         for head in linked_units_list:
             node = head
             while node and node.next:
                 if node.active and node.next.active:
-                    pairs[(node.unit, node.next.unit)].add(node)
+                    pairs_positions[(node.unit, node.next.unit)].add(node)
                 node = node.next
 
         merge_order = []
         next_new_unit = max(initial_vocab) + 1
 
         # Build a count dictionary and a max-heap (using negative counts).
-        pairs_count = {pair: len(nodes) for pair, nodes in pairs.items()}
+        pairs_count = {pair: len(nodes) for pair, nodes in pairs_positions.items()}
         priority_queue = []
         for pair, count in pairs_count.items():
             heapq.heappush(priority_queue, (-count, pair))
@@ -126,7 +126,7 @@ class FastBPETokenizer(BaseTokenizer):
             update_count_pairs = set()
 
             # Process all valid occurrences of best_pair.
-            for node in list(pairs[most_frequent_pair]):
+            for node in list(pairs_positions[most_frequent_pair]):
                 if not (node.active and node.next and node.next.active and (node.unit, node.next.unit) == most_frequent_pair):
                     continue
                 node.unit = new_unit
@@ -138,24 +138,24 @@ class FastBPETokenizer(BaseTokenizer):
                 # Update neighboring pairs.
                 if node.prev:
                     old_pair = (node.prev.unit, a)
-                    if node.prev in pairs[old_pair]:
-                        pairs[old_pair].discard(node.prev)
+                    if node.prev in pairs_positions[old_pair]:
+                        pairs_positions[old_pair].discard(node.prev)
                         update_count_pairs.add(old_pair)
                     new_pair = (node.prev.unit, node.unit)
-                    pairs[new_pair].add(node.prev)
+                    pairs_positions[new_pair].add(node.prev)
                     update_count_pairs.add(new_pair)
                 if node.next:
                     new_pair = (node.unit, node.next.unit)
-                    pairs[new_pair].add(node)
+                    pairs_positions[new_pair].add(node)
                     update_count_pairs.add(new_pair)
                     old_pair = (b, node.next.unit)
-                    if removed in pairs[old_pair]:
-                        pairs[old_pair].discard(removed)
+                    if removed in pairs_positions[old_pair]:
+                        pairs_positions[old_pair].discard(removed)
                         update_count_pairs.add(old_pair)
 
             # Refresh counts in the priority queue for affected pairs.
             for pair in update_count_pairs:
-                pairs_count[pair] = len(pairs[pair])
+                pairs_count[pair] = len(pairs_positions[pair])
                 heapq.heappush(priority_queue, (-pairs_count[pair], pair))
 
             pairs_count[most_frequent_pair] = 0
