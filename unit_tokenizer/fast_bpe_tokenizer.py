@@ -10,10 +10,10 @@ logging.basicConfig(
 
 
 class Node:
-    __slots__ = ("token", "prev", "next", "active")
+    __slots__ = ("unit", "prev", "next", "active")
 
-    def __init__(self, token: int):
-        self.token = token
+    def __init__(self, unit: int):
+        self.unit = unit
         self.prev = None
         self.next = None
         self.active = True
@@ -36,8 +36,8 @@ class FastBPETokenizer(BaseTokenizer):
     def _build_linked_list(seq: list[int]) -> Node:
         head = Node(seq[0])
         current = head
-        for token in seq[1:]:
-            new_node = Node(token)
+        for unit in seq[1:]:
+            new_node = Node(unit)
             new_node.prev = current
             current.next = new_node
             current = new_node
@@ -49,22 +49,22 @@ class FastBPETokenizer(BaseTokenizer):
         node = head
         while node:
             if node.active:
-                result.append(node.token)
+                result.append(node.unit)
             node = node.next
         return result
 
-    def fit(self, train_data: list[list[int]], target_vocab_size: int) -> None:
+    def fit(self, units_list: list[list[int]], target_vocab_size: int) -> None:
         """
         Learn merge rules from training data until the target vocabulary size is reached.
         This version uses a priority queue to extract the best pair in O(log n) time.
         """
-        if not train_data or not any(train_data):
+        if not units_list or not any(units_list):
             error_message = "Training data is empty."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
         # Determine initial vocabulary.
-        initial_vocab = {token for seq in train_data for token in seq}
+        initial_vocab = {unit for units in units_list for unit in units}
         initial_vocab_size = len(initial_vocab)
         if target_vocab_size <= initial_vocab_size:
             error_message = (
@@ -78,19 +78,19 @@ class FastBPETokenizer(BaseTokenizer):
         self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
 
         # Build linked lists for each sequence.
-        linked_sequences = [self._build_linked_list(seq) for seq in train_data]
+        linked_units_list = [self._build_linked_list(units) for units in units_list]
 
         # Map each adjacent pair to the set of left nodes.
         pairs: dict[tuple[int, int], set[Node]] = defaultdict(set)
-        for head in linked_sequences:
+        for head in linked_units_list:
             node = head
             while node and node.next:
                 if node.active and node.next.active:
-                    pairs[(node.token, node.next.token)].add(node)
+                    pairs[(node.unit, node.next.unit)].add(node)
                 node = node.next
 
-        merge_rules = []
-        next_new_token = max(initial_vocab) + 1
+        merge_order = []
+        next_new_unit = max(initial_vocab) + 1
 
         # Build a count dictionary and a max-heap (using negative counts).
         pairs_count = {pair: len(nodes) for pair, nodes in pairs.items()}
@@ -98,9 +98,9 @@ class FastBPETokenizer(BaseTokenizer):
         for pair, count in pairs_count.items():
             heapq.heappush(priority_queue, (-count, pair))
 
-        for merge_index in range(num_merges):
-            best_pair = None
-            best_count = 0
+        for i in range(num_merges):
+            most_frequent_pair = None
+            most_frequent_count = 0
 
             # Extract the pair with the highest frequency.
             while priority_queue:
@@ -108,28 +108,28 @@ class FastBPETokenizer(BaseTokenizer):
                 count = -neg_count
                 # Check if this count is up-to-date.
                 if pairs_count.get(pair, 0) == count:
-                    best_pair = pair
-                    best_count = count
+                    most_frequent_pair = pair
+                    most_frequent_count = count
                     break
 
-            if best_pair is None or best_count == 0:
+            if most_frequent_pair is None or most_frequent_count == 0:
                 self.logger.warning("No more valid pairs to merge.")
                 break
 
-            a, b = best_pair
-            new_token = next_new_token
-            next_new_token += 1
-            merge_rules.append((best_pair, new_token))
-            self.merges[best_pair] = new_token
-            self.logger.info(f"Merge {merge_index+1}/{num_merges}: {best_pair} -> {new_token}")
+            a, b = most_frequent_pair
+            new_unit = next_new_unit
+            next_new_unit += 1
+            merge_order.append((most_frequent_pair, new_unit))
+            self.merges[most_frequent_pair] = new_unit
+            self.logger.info(f"Merge {i+1}/{num_merges}: {most_frequent_pair} -> {new_unit}")
 
             update_count_pairs = set()
 
             # Process all valid occurrences of best_pair.
-            for node in list(pairs[best_pair]):
-                if not (node.active and node.next and node.next.active and (node.token, node.next.token) == best_pair):
+            for node in list(pairs[most_frequent_pair]):
+                if not (node.active and node.next and node.next.active and (node.unit, node.next.unit) == most_frequent_pair):
                     continue
-                node.token = new_token
+                node.unit = new_unit
                 removed = node.next
                 node.next = removed.next
                 if removed.next:
@@ -137,18 +137,18 @@ class FastBPETokenizer(BaseTokenizer):
 
                 # Update neighboring pairs.
                 if node.prev:
-                    old_pair = (node.prev.token, a)
+                    old_pair = (node.prev.unit, a)
                     if node.prev in pairs[old_pair]:
                         pairs[old_pair].discard(node.prev)
                         update_count_pairs.add(old_pair)
-                    new_pair = (node.prev.token, node.token)
+                    new_pair = (node.prev.unit, node.unit)
                     pairs[new_pair].add(node.prev)
                     update_count_pairs.add(new_pair)
                 if node.next:
-                    new_pair = (node.token, node.next.token)
+                    new_pair = (node.unit, node.next.unit)
                     pairs[new_pair].add(node)
                     update_count_pairs.add(new_pair)
-                    old_pair = (b, node.next.token)
+                    old_pair = (b, node.next.unit)
                     if removed in pairs[old_pair]:
                         pairs[old_pair].discard(removed)
                         update_count_pairs.add(old_pair)
@@ -157,10 +157,11 @@ class FastBPETokenizer(BaseTokenizer):
             for pair in update_count_pairs:
                 pairs_count[pair] = len(pairs[pair])
                 heapq.heappush(priority_queue, (-pairs_count[pair], pair))
-            pairs_count[best_pair] = 0
+
+            pairs_count[most_frequent_pair] = 0
 
         # Store the merge order.
-        self.merge_order = merge_rules
+        self.merge_order = merge_order
         self.logger.info("Finished fitting tokenizer.")
 
     def fit_from_file(self, train_file: str, target_vocab_size: int) -> None:
@@ -178,41 +179,41 @@ class FastBPETokenizer(BaseTokenizer):
         """
         encoded_sequences = []
         for sequence in units_list:
-            tokens = sequence.copy()
-            for (a, b), new_token in self.merge_order:
+            units = sequence.copy()
+            for (a, b), new_unit in self.merge_order:
                 i = 0
-                new_tokens = []
-                # Scan tokens left-to-right merging every occurrence of (a, b)
-                while i < len(tokens):
-                    if i < len(tokens) - 1 and tokens[i] == a and tokens[i + 1] == b:
-                        new_tokens.append(new_token)
+                new_units = []
+                # Scan units left-to-right merging every occurrence of (a, b)
+                while i < len(units):
+                    if i < len(units) - 1 and units[i] == a and units[i + 1] == b:
+                        new_units.append(new_unit)
                         i += 2
                     else:
-                        new_tokens.append(tokens[i])
+                        new_units.append(units[i])
                         i += 1
-                tokens = new_tokens
-            encoded_sequences.append(tokens)
+                units = new_units
+            encoded_sequences.append(units)
         return encoded_sequences
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Recursively expand merged tokens using the stored swapped_merges.
+        Recursively expand merged units using the stored swapped_merges.
         """
         if not self.swapped_merges:
             self.swapped_merges = {v: k for k, v in self.merges.items()}
 
-        def recursive_decode(token: int) -> list[int]:
-            if token in self.swapped_merges:
-                a, b = self.swapped_merges[token]
+        def recursive_decode(unit: int) -> list[int]:
+            if unit in self.swapped_merges:
+                a, b = self.swapped_merges[unit]
                 return recursive_decode(a) + recursive_decode(b)
             else:
-                return [token]
+                return [unit]
 
         decoded_sequences = []
         for sequence in units_list:
             decoded_sequence = []
-            for token in sequence:
-                decoded_sequence.extend(recursive_decode(token))
+            for unit in sequence:
+                decoded_sequence.extend(recursive_decode(unit))
             decoded_sequences.append(decoded_sequence)
         return decoded_sequences
 
@@ -228,7 +229,7 @@ class FastBPETokenizer(BaseTokenizer):
             raise ValueError(error_message)
         data = {
             "merge_order": [
-                [pair[0], pair[1], new_token] for (pair, new_token) in self.merge_order
+                [pair[0], pair[1], new_units] for (pair, new_units) in self.merge_order
             ]
         }
         with open(json_file, "w") as f:
@@ -244,10 +245,10 @@ class FastBPETokenizer(BaseTokenizer):
         self.merge_order = []
         self.merges = {}
         for item in data.get("merge_order", []):
-            a, b, new_token = item
+            a, b, new_unit = item
             pair = (a, b)
-            self.merge_order.append((pair, new_token))
-            self.merges[pair] = new_token
+            self.merge_order.append((pair, new_unit))
+            self.merges[pair] = new_unit
         self.swapped_merges = {v: k for k, v in self.merges.items()}
         self.logger.info(f"Tokenizer loaded from {json_file}.")
 

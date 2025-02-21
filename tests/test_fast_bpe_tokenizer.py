@@ -6,7 +6,7 @@ from unit_tokenizer import FastBPETokenizer
 def test_fit():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     assert tokenizer.merges == {(0, 1): 6, (6, 2): 7, (7, 3): 8, (8, 4): 9}
@@ -15,7 +15,7 @@ def test_fit():
 def test_encode():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     encoded = tokenizer.encode([[0, 1, 0, 1, 2, 3, 4, 5]])
@@ -25,7 +25,7 @@ def test_encode():
 def test_decode():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     encoded = tokenizer.encode([[0, 1, 0, 1, 2, 3, 4, 5]])
@@ -36,7 +36,7 @@ def test_decode():
 def test_arbitrary_onset():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[1, 2, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6]],
+        units_list=[[1, 2, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6]],
         target_vocab_size=10,
     )
     encoded = tokenizer.encode([[1, 2, 1, 2, 3, 4, 5, 6]])
@@ -47,7 +47,7 @@ def test_arbitrary_onset():
 def test_save_and_load():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     tokenizer.save("test_save_and_load.json")
@@ -67,7 +67,7 @@ def test_save_and_load():
 def test_batch_encode():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     encoded = tokenizer.encode([[0, 1, 0, 1, 2, 3, 4, 5], [0, 1, 2, 0, 1, 2, 3]])
@@ -77,7 +77,7 @@ def test_batch_encode():
 def test_batch_decode():
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     encoded = [[6, 9, 5], [7, 8]]
@@ -109,7 +109,7 @@ def test_encode_from_file():
 
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     tokenizer.encode_from_file(input_file, output_file)
@@ -133,7 +133,7 @@ def test_decode_from_file():
 
     tokenizer = FastBPETokenizer()
     tokenizer.fit(
-        train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
+        units_list=[[0, 1, 0, 1, 2, 0, 1, 2, 3], [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
     tokenizer.decode_from_file(input_file, output_file)
