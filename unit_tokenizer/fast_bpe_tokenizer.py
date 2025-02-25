@@ -2,50 +2,53 @@ import json
 import logging
 import heapq
 from collections import defaultdict
+from typing import Optional
 from unit_tokenizer import BaseTokenizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-
-class Node:
+class LinkedListNode:
     __slots__ = ("unit", "prev", "next", "active")
     def __init__(self, unit: int):
         self.unit = unit
-        self.prev = None
-        self.next = None
+        self.prev: Optional[LinkedListNode] = None
+        self.next: Optional[LinkedListNode] = None
         self.active = True
 
+class TrieNode:
+    def __init__(self):
+        self.children = {}  # Maps a base token (int) to a TrieNode.
+        self.merged_token: Optional[int] = None  # Set to a merged token (int) when this node ends a valid sequence.
 
 class FastBPETokenizer(BaseTokenizer):
     """
     Fast BPE Tokenizer for integer sequences.
-    A priority queue is used for fitting.
-    A trie used for encoding.
+    Uses linked list for efficient sequence updates.
+    Uses a priority queue for fitting and a trie for encoding.
     """
-
     def __init__(self) -> None:
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.merge_rules: list[tuple[tuple[int, int], int]] = []
-        self.decoded_merges: dict[int, list[int]] = {}  # Cache: maps each token (base or merged) to its fully decoded sequence.
-        self.trie: dict = {}  # Trie for fast matching in encoding.
-        self.initial_vocab_max: int = 0  # Maximum initial token value (used to distinguish initial tokens from merged tokens).
+        self.decoded_merge_rules: dict[int, list[int]] = {}  # Maps each token to its fully decoded sequence.
+        self.trie: TrieNode = TrieNode()  # Root of the trie.
+        self.initial_vocab_max: int = 0  # Maximum initial token value.
 
     @staticmethod
-    def _build_linked_list(units: list[int]) -> Node:
-        head = Node(units[0])
+    def _build_linked_list(units: list[int]) -> LinkedListNode:
+        head = LinkedListNode(units[0])
         current = head
         for unit in units[1:]:
-            new_node = Node(unit)
+            new_node = LinkedListNode(unit)
             new_node.prev = current
             current.next = new_node
             current = new_node
         return head
 
     @staticmethod
-    def _linked_list_to_list(head: Node) -> list[int]:
+    def _linked_list_to_list(head: LinkedListNode) -> list[int]:
         result = []
         node = head
         while node:
@@ -72,18 +75,17 @@ class FastBPETokenizer(BaseTokenizer):
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        # Initialize cache with base tokens.
         for token in initial_vocab:
-            self.decoded_merges[token] = [token]
+            self.decoded_merge_rules[token] = [token]
 
         num_merges = target_vocab_size - initial_vocab_size
         self.logger.info(f"Fitting tokenizer with {num_merges} merges.")
 
         # Build linked lists for each sequence.
-        linked_units_list: list[Node] = [self._build_linked_list(units) for units in units_list]
+        linked_units_list: list[LinkedListNode] = [self._build_linked_list(units) for units in units_list]
 
         # Map each adjacent pair to the set of left nodes.
-        pairs_positions: dict[tuple[int, int], set[Node]] = defaultdict(set)
+        pairs_positions: dict[tuple[int, int], set[LinkedListNode]] = defaultdict(set)
         for head in linked_units_list:
             node = head
             while node and node.next:
@@ -120,7 +122,7 @@ class FastBPETokenizer(BaseTokenizer):
             new_unit = next_new_unit
             next_new_unit += 1
             merge_rules.append((most_frequent_pair, new_unit))
-            self.decoded_merges[new_unit] = self.decoded_merges[a] + self.decoded_merges[b]
+            self.decoded_merge_rules[new_unit] = self.decoded_merge_rules[a] + self.decoded_merge_rules[b]
             self.logger.info(f"Merge {i+1}/{num_merges}: {most_frequent_pair} -> {new_unit}")
 
             update_count_pairs = set()
@@ -172,21 +174,20 @@ class FastBPETokenizer(BaseTokenizer):
         Build a trie from cached final sequences for all merged tokens.
         Only tokens greater than initial_vocab_max (i.e. non-base tokens) are added.
         """
-        self.trie = {}
-        for token, seq in self.decoded_merges.items():
-            if token <= self.initial_vocab_max:
+        self.trie = TrieNode()
+        for unit, decoded_units in self.decoded_merge_rules.items():
+            if unit <= self.initial_vocab_max:
                 continue
             node = self.trie
-            for t in seq:
-                if t not in node:
-                    node[t] = {}
-                node = node[t]
-            node["token"] = token
+            for u in decoded_units:
+                if u not in node.children:
+                    node.children[u] = TrieNode()
+                node = node.children[u]
+            node.merged_token = unit
 
     def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
         Encode sequences using a greedy longest-match search in the trie.
-        This replaces iterative scanning over the merge order.
         """
         encoded_units_list = []
         for units in units_list:
@@ -196,11 +197,11 @@ class FastBPETokenizer(BaseTokenizer):
                 node = self.trie
                 match = None
                 j = i
-                # Greedily match the longest sequence.
-                while j < len(units) and units[j] in node:
-                    node = node[units[j]]
-                    if "token" in node:
-                        match = (node["token"], j)
+                # Greedily traverse the trie.
+                while j < len(units) and units[j] in node.children:
+                    node = node.children[units[j]]
+                    if node.merged_token is not None:
+                        match = (node.merged_token, j)
                     j += 1
                 if match is not None:
                     token, j_match = match
@@ -220,7 +221,7 @@ class FastBPETokenizer(BaseTokenizer):
         for units in units_list:
             decoded_units = []
             for unit in units:
-                decoded_units.extend(self.decoded_merges.get(unit, [unit]))
+                decoded_units.extend(self.decoded_merge_rules.get(unit, [unit]))
             decoded_units_list.append(decoded_units)
         return decoded_units_list
 
@@ -253,13 +254,13 @@ class FastBPETokenizer(BaseTokenizer):
             pair = (a, b)
             self.merge_rules.append((pair, new_unit))
 
-        self.decoded_merges = {}
+        self.decoded_merge_rules = {}
         for pair, new_unit in self.merge_rules:
             a, b = pair
-            if a not in self.decoded_merges:
-                self.decoded_merges[a] = [a]
-            if b not in self.decoded_merges:
-                self.decoded_merges[b] = [b]
-            self.decoded_merges[new_unit] = self.decoded_merges[a] + self.decoded_merges[b]
+            if a not in self.decoded_merge_rules:
+                self.decoded_merge_rules[a] = [a]
+            if b not in self.decoded_merge_rules:
+                self.decoded_merge_rules[b] = [b]
+            self.decoded_merge_rules[new_unit] = self.decoded_merge_rules[a] + self.decoded_merge_rules[b]
         self._build_trie()
         self.logger.info(f"Tokenizer loaded from {json_file}.")
