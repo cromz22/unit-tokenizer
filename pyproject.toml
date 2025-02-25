@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "unit-tokenizer"
-version = "0.1.5"
+version = "0.1.6"
 description = "Tokenizers that operate on integer sequences."
 authors = ["Shuichiro Shimizu"]
 license = "MIT"
