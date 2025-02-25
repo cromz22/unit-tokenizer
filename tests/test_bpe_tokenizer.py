@@ -9,7 +9,7 @@ def test_fit():
         train_data=[[0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5]],
         target_vocab_size=10,
     )
-    assert tokenizer.merges == {(0, 1): 6, (6, 2): 7, (7, 3): 8, (8, 4): 9}
+    assert tokenizer.merge_rules == [((0, 1), 6), ((6, 2), 7), ((7, 3), 8), ((8, 4), 9)]
 
 
 def test_encode():
@@ -94,7 +94,7 @@ def test_fit_from_file():
     tokenizer = BPETokenizer()
     tokenizer.fit_from_file(train_data_file, target_vocab_size=10)
 
-    assert tokenizer.merges == {(0, 1): 6, (6, 2): 7, (7, 3): 8, (8, 4): 9}
+    assert tokenizer.merge_rules == [((0, 1), 6), ((6, 2), 7), ((7, 3), 8), ((8, 4), 9)]
 
     # clean up
     os.remove(train_data_file)

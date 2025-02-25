@@ -7,7 +7,6 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-
 class BPETokenizer(BaseTokenizer):
     """
     Pure BPE tokenizer that operates on a sequence of units.
@@ -15,8 +14,17 @@ class BPETokenizer(BaseTokenizer):
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.merges = {}
-        self.swapped_merges = {}
+        self.merge_rules: list[tuple[tuple[int, int], int]] = []
+
+    @property
+    def merge_mapping(self) -> dict[tuple[int, int], int]:
+        """Compute mapping from pair to merged token."""
+        return {pair: new_token for pair, new_token in self.merge_rules}
+
+    @property
+    def reverse_merge_mapping(self) -> dict[int, tuple[int, int]]:
+        """Compute reverse mapping from merged token to pair."""
+        return {new_token: pair for pair, new_token in self.merge_rules}
 
     def _get_counts(self, units_list: list[list[int]]) -> dict[tuple[int, int], int]:
         """
@@ -25,15 +33,10 @@ class BPETokenizer(BaseTokenizer):
         counts = {}
         for units in units_list:
             for pair in zip(units[:-1], units[1:]):
-                if pair in counts:
-                    counts[pair] += 1
-                else:
-                    counts[pair] = 1
+                counts[pair] = counts.get(pair, 0) + 1
         return counts
 
-    def _merge(
-        self, units_list: list[list[int]], pair: tuple[int, int], idx: int
-    ) -> list[list[int]]:
+    def _merge(self, units_list: list[list[int]], pair: tuple[int, int], idx: int) -> list[list[int]]:
         """
         Replace all occurrences of `pair` in `units_list` with `idx`.
         """
@@ -67,7 +70,9 @@ class BPETokenizer(BaseTokenizer):
         max_idx = max(set_units)
 
         if target_vocab_size <= initial_vocab_size:
-            error_message = f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
+            error_message = (
+                f"Target vocab size ({target_vocab_size}) must be greater than the initial vocab size ({initial_vocab_size})."
+            )
             self.logger.error(error_message)
             raise ValueError(error_message)
 
@@ -83,10 +88,9 @@ class BPETokenizer(BaseTokenizer):
             top_pair = max(counts, key=counts.get)
             new_idx = max_idx + 1
             units_list = self._merge(units_list, top_pair, new_idx)
-            self.merges[top_pair] = new_idx
+            self.merge_rules.append((top_pair, new_idx))
             self.logger.info(f"Merge {i + 1}/{num_merges}: {top_pair} -> {new_idx}")
             self.logger.debug(f"units: {units_list}")
-
             max_idx = new_idx
 
     def fit_from_file(self, train_file: str, target_vocab_size: int) -> None:
@@ -100,64 +104,55 @@ class BPETokenizer(BaseTokenizer):
 
     def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Encode a batch of sequence of integers with merges.
+        Encode a batch of sequences of integers using the stored merge rules.
         """
-        if not self.merges:
+        if not self.merge_rules:
             error_message = "Tokenizer must be fitted or loaded before encoding."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
         if not all(isinstance(units, list) for units in units_list):
-            error_message = "Input should be of type list[list[int]]"
+            error_message = "Input should be of type list[list[int]]."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
+        mapping = self.merge_mapping
         self.logger.debug(f"Encoding: {units_list}")
 
         for i, units in enumerate(units_list):
             while len(units) >= 2:
                 counts = self._get_counts([units])
-                pair_to_merge = min(
-                    counts, key=lambda pair: self.merges.get(pair, float("inf"))
-                )
-                if pair_to_merge not in self.merges:
+                pair_to_merge = min(counts, key=lambda pair: mapping.get(pair, float("inf")))
+                if pair_to_merge not in mapping:
                     break
-                idx = self.merges[pair_to_merge]
+                idx = mapping[pair_to_merge]
                 units = self._merge([units], pair_to_merge, idx)[0]
             units_list[i] = units
 
         self.logger.info("Finished encoding.")
         self.logger.debug(f"Encoded: {units_list}")
-
         return units_list
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Decode a batch of sequence of integers with merges.
+        Decode a batch of sequences of integers using the stored merge rules.
         """
-        if not self.merges:
-            error_message = "Tokenizer must be fitted or loaded before encoding."
+        if not self.merge_rules:
+            error_message = "Tokenizer must be fitted or loaded before decoding."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        if not all(isinstance(units, list) for units in units_list):
-            error_message = "Input should be of type list[list[int]]"
-            self.logger.error(error_message)
-            raise ValueError(error_message)
-
+        reverse_mapping = self.reverse_merge_mapping
         self.logger.debug(f"Decoding: {units_list}")
-
-        if not self.swapped_merges:
-            self.swapped_merges = {v: k for k, v in self.merges.items()}
 
         for j, units in enumerate(units_list):
             set_units = set(units)
-            while set_units & set(self.swapped_merges.keys()):
+            while set_units & set(reverse_mapping.keys()):
                 decoded_units = []
                 i = 0
                 while i < len(units):
-                    if units[i] in self.swapped_merges:
-                        pair = self.swapped_merges[units[i]]
+                    if units[i] in reverse_mapping:
+                        pair = reverse_mapping[units[i]]
                         decoded_units.extend(pair)
                         i += 1
                     else:
@@ -169,41 +164,37 @@ class BPETokenizer(BaseTokenizer):
 
         self.logger.info("Finished decoding.")
         self.logger.debug(f"Decoded: {units_list}")
-
         return units_list
 
     def save(self, json_file: str) -> None:
         """
-        Save the tokenizer to a file.
+        Save the tokenizer to a file in a unified format.
+        The saved JSON contains a key "merge_rules" whose value is a list of triples [a, b, new_token].
         """
-        if not self.merges:
+        if not self.merge_rules:
             error_message = "Tokenizer must be fitted or loaded before saving."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        if not self.swapped_merges:
-            self.swapped_merges = {v: k for k, v in self.merges.items()}
-
-        self.logger.debug(f"merges: {self.merges}")
-        self.logger.debug(f"swapped_merges: {self.swapped_merges}")
-
+        data = {
+            "merge_rules": [[a, b, new_token] for ((a, b), new_token) in self.merge_rules]
+        }
         with open(json_file, "w") as f:
-            json.dump(self.swapped_merges, f)
-
+            json.dump(data, f)
         self.logger.info(f"Tokenizer saved to {json_file}.")
 
     def load(self, json_file: str) -> None:
         """
-        Load the tokenizer from a file.
+        Load the tokenizer from a file in the unified format.
+        Reconstructs the merge rules.
         """
-
         with open(json_file, "r") as f:
-            self.swapped_merges = json.load(f)
-
-        self.swapped_merges = {int(k): tuple(v) for k, v in self.swapped_merges.items()}
-        self.merges = {v: k for k, v in self.swapped_merges.items()}
-
-        self.logger.debug(f"merges: {self.merges}")
-        self.logger.debug(f"swapped_merges: {self.swapped_merges}")
-
+            data = json.load(f)
+        merge_rules_data = data.get("merge_rules")
+        if merge_rules_data is None:
+            error_message = "Invalid file format."
+            self.logger.error(error_message)
+            raise ValueError(error_message)
+        self.merge_rules = [((item[0], item[1]), item[2]) for item in merge_rules_data]
+        self.logger.debug(f"merge_rules: {self.merge_rules}")
         self.logger.info(f"Tokenizer loaded from {json_file}.")
