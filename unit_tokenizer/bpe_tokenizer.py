@@ -17,11 +17,6 @@ class BPETokenizer(BaseTokenizer):
         self.merge_rules: list[tuple[tuple[int, int], int]] = []
 
     @property
-    def merge_mapping(self) -> dict[tuple[int, int], int]:
-        """Compute mapping from pair to merged token."""
-        return {pair: new_token for pair, new_token in self.merge_rules}
-
-    @property
     def reverse_merge_mapping(self) -> dict[int, tuple[int, int]]:
         """Compute reverse mapping from merged token to pair."""
         return {new_token: pair for pair, new_token in self.merge_rules}
@@ -104,38 +99,27 @@ class BPETokenizer(BaseTokenizer):
 
     def encode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Encode a batch of sequences of integers using the stored merge rules.
+        Encode a batch of sequences of integers by sequentially applying the learned merge rules in order.
         """
         if not self.merge_rules:
             error_message = "Tokenizer must be fitted or loaded before encoding."
             self.logger.error(error_message)
             raise ValueError(error_message)
 
-        if not all(isinstance(units, list) for units in units_list):
-            error_message = "Input should be of type list[list[int]]."
-            self.logger.error(error_message)
-            raise ValueError(error_message)
-
-        mapping = self.merge_mapping
         self.logger.debug(f"Encoding: {units_list}")
-
-        for i, units in enumerate(units_list):
-            while len(units) >= 2:
-                counts = self._get_counts([units])
-                pair_to_merge = min(counts, key=lambda pair: mapping.get(pair, float("inf")))
-                if pair_to_merge not in mapping:
-                    break
-                idx = mapping[pair_to_merge]
-                units = self._merge([units], pair_to_merge, idx)[0]
-            units_list[i] = units
-
+        encoded_units_list = []
+        for units in units_list:
+            # Apply each merge rule in the order they were learned.
+            for pair, new_token in self.merge_rules:
+                units = self._merge([units], pair, new_token)[0]
+            encoded_units_list.append(units)
         self.logger.info("Finished encoding.")
-        self.logger.debug(f"Encoded: {units_list}")
-        return units_list
+        self.logger.debug(f"Encoded: {encoded_units_list}")
+        return encoded_units_list
 
     def decode(self, units_list: list[list[int]]) -> list[list[int]]:
         """
-        Decode a batch of sequences of integers using the stored merge rules.
+        Decode a batch of sequences of integers by iteratively replacing merged tokens with their original pairs.
         """
         if not self.merge_rules:
             error_message = "Tokenizer must be fitted or loaded before decoding."
@@ -145,26 +129,24 @@ class BPETokenizer(BaseTokenizer):
         reverse_mapping = self.reverse_merge_mapping
         self.logger.debug(f"Decoding: {units_list}")
 
-        for j, units in enumerate(units_list):
-            set_units = set(units)
-            while set_units & set(reverse_mapping.keys()):
+        decoded_units_list = []
+        for units in units_list:
+            # Repeatedly replace tokens that were merged.
+            while any(token in reverse_mapping for token in units):
                 decoded_units = []
                 i = 0
                 while i < len(units):
                     if units[i] in reverse_mapping:
-                        pair = reverse_mapping[units[i]]
-                        decoded_units.extend(pair)
+                        decoded_units.extend(reverse_mapping[units[i]])
                         i += 1
                     else:
                         decoded_units.append(units[i])
                         i += 1
                 units = decoded_units
-                set_units = set(units)
-            units_list[j] = units
-
+            decoded_units_list.append(units)
         self.logger.info("Finished decoding.")
-        self.logger.debug(f"Decoded: {units_list}")
-        return units_list
+        self.logger.debug(f"Decoded: {decoded_units_list}")
+        return decoded_units_list
 
     def save(self, json_file: str) -> None:
         """
