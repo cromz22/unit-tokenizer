@@ -132,6 +132,7 @@ class FastBPETokenizer(BaseTokenizer):
                     continue
                 node.unit = new_unit
                 removed = node.next
+                removed.active = False
                 node.next = removed.next
                 if removed.next:
                     removed.next.prev = node
