@@ -1,6 +1,7 @@
 # Unit Tokenizer
 
 ![pytest](https://github.com/cromz22/unit-tokenizer/actions/workflows/run_pytest.yml/badge.svg)
+![pypi](https://img.shields.io/pypi/v/unit-tokenizer)
 
 Tokenizers that operate on integer sequences.
 
