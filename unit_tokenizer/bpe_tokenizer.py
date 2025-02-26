@@ -80,7 +80,7 @@ class BPETokenizer(BaseTokenizer):
             if not counts:
                 self.logger.warning("No more pairs to merge.")
                 break
-            top_pair = max(counts, key=counts.get)
+            top_pair, _count = max(counts.items(), key=lambda x: (x[1], -x[0][0], -x[0][1]))
             new_idx = max_idx + 1
             units_list = self._merge(units_list, top_pair, new_idx)
             self.merge_rules.append((top_pair, new_idx))
