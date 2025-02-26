@@ -13,6 +13,9 @@ Tokenizers that operate on integer sequences.
 - BPETokenizer
     - Byte-pair encoding algorithm
 
+- FastBPETokenizer
+    - BPE using priority queue, linked list, trie for fast processing
+
 - RLETokenizer
     - Run-length encoding algorithm
 
